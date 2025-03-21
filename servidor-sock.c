@@ -75,7 +75,7 @@ void process_request(RequestMessage *req, ResponseMessage *res) {
 #endif
             res->result = destroy();
             break;
-        // Operacion set
+            // Operacion set
         case OP_SET:
 #ifdef DEBUG
             printf("[Servidor] Operación: SET (key=%d)\n", req->key);
@@ -83,7 +83,7 @@ void process_request(RequestMessage *req, ResponseMessage *res) {
 
             res->result = set_value(req->key, req->value1, req->N_value2, req->V_value2, req->value3);
             break;
-        // Operacion get
+            // Operacion get
         case OP_GET:
 #ifdef DEBUG
             printf("[Servidor] Operación: GET (key=%d)\n", req->key);
@@ -91,7 +91,7 @@ void process_request(RequestMessage *req, ResponseMessage *res) {
 
             res->result = get_value(req->key, res->value1, &res->N_value2, res->V_value2, &res->value3);
             break;
-        // Operacion modify
+            // Operacion modify
         case OP_MODIFY:
 #ifdef DEBUG
             printf("[Servidor] Operación: MODIFY (key=%d)\n", req->key);
@@ -99,7 +99,7 @@ void process_request(RequestMessage *req, ResponseMessage *res) {
 
             res->result = modify_value(req->key, req->value1, req->N_value2, req->V_value2, req->value3);
             break;
-        // Operacion delete
+            // Operacion delete
         case OP_DELETE:
 #ifdef DEBUG
             printf("[Servidor] Operación: DELETE (key=%d)\n", req->key);
@@ -107,7 +107,7 @@ void process_request(RequestMessage *req, ResponseMessage *res) {
 
             res->result = delete_key(req->key);
             break;
-        // Operacion exist
+            // Operacion exist
         case OP_EXIST:
 #ifdef  DEBUG
             printf("[Servidor] Operación: EXIST (key=%d)\n", req->key);
@@ -115,7 +115,7 @@ void process_request(RequestMessage *req, ResponseMessage *res) {
 
             res->result = exist(req->key);
             break;
-        //operacion por defecto rechazar
+            //operacion por defecto rechazar
         default:
 #ifdef DEBUG
             printf("[Servidor] Operación desconocida\n");
@@ -268,7 +268,7 @@ int main() {
 #ifdef DEBUG
             perror("[Servidor] Error en recepción");
 #endif
-            
+
             break;
         }
         // Comprobar si se ha recibido la señal de finalización
