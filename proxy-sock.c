@@ -1,158 +1,149 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <mqueue.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include "claves.h"
 
-#define MQ_SERVER "/mq_servidor"
-#define MQ_CLIENT_TEMPLATE "/mq_cliente_%d"
+#define MAX_BUFFER 1024
 
-// Estructura del mensaje de solicitud
-typedef struct {
-    long client_pid;
-    int operation;
-    int key;
-    char value1[256];
-    int N_value2;
-    double V_value2[32];
-    struct Coord value3;
-} RequestMessage;
-
-// Estructura del mensaje de respuesta
-typedef struct {
-    int result;
-    char value1[256];
-    int N_value2;
-    double V_value2[32];
-    struct Coord value3;
-} ResponseMessage;
-
-// Función para comunicarse con el servidor
-int send_request_to_server(RequestMessage *req, ResponseMessage *res) {
-    // verificar que los punteros no son nulos
-    if (req == NULL || res == NULL) return -1;
-    // Crear el nombre de la cola del cliente
-    char mq_client_name[64];
-    snprintf(mq_client_name, sizeof(mq_client_name), MQ_CLIENT_TEMPLATE, getpid());
-
-    // Crear la cola del cliente
-    struct mq_attr attr;
-    memset(&attr, 0, sizeof(struct mq_attr));
-    attr.mq_maxmsg = 10;
-    attr.mq_msgsize = sizeof(ResponseMessage);
-
-    // Crear la cola del cliente para recibir la respuesta
-    mqd_t mq_client = mq_open(mq_client_name, O_CREAT | O_RDONLY, 0666, &attr);
-    if (mq_client == (mqd_t) - 1) return -2;
-
-    // Abrir la cola del servidor
-    mqd_t mq_server = mq_open(MQ_SERVER, O_WRONLY);
-    // Comprobar si se ha abierto correctamente
-    if (mq_server == (mqd_t) - 1) {
-        mq_close(mq_client);
-        mq_unlink(mq_client_name);
-        return -2;// Error al abrir la cola del servidor
+// Función para conectarse al servidor
+int conectar_servidor() {
+    char *ip = getenv("IP_TUPLAS");
+    char *port_str = getenv("PORT_TUPLAS");
+    if (!ip || !port_str) {
+        fprintf(stderr, "Error: Variables de entorno IP_TUPLAS y PORT_TUPLAS no definidas\n");
+        return -1;
     }
 
-    // Enviar la solicitud al servidor
-    req->client_pid = getpid();
-    if (mq_send(mq_server, (char *) req, sizeof(RequestMessage), 0) == -1) {
-        mq_close(mq_client);
-        mq_unlink(mq_client_name);
-        mq_close(mq_server);
-        return -2;// Error al enviar la solicitud
+    int port = atoi(port_str);
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        perror("Error al crear socket");
+        return -1;
     }
 
-    // Esperar respuesta del servidor
-    if (mq_receive(mq_client, (char *) res, sizeof(ResponseMessage), NULL) == -1) {
-        mq_close(mq_client);
-        mq_unlink(mq_client_name);
-        mq_close(mq_server);
-        return -2;// Error al recibir la respuesta
+    struct sockaddr_in server_addr = {
+            .sin_family = AF_INET,
+            .sin_port = htons(port)
+    };
+    inet_pton(AF_INET, ip, &server_addr.sin_addr);
+
+    if (connect(sock, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+        perror("Error al conectar con el servidor");
+        close(sock);
+        return -1;
     }
-
-    // Cerrar colas
-    mq_close(mq_client);
-    mq_unlink(mq_client_name);
-    mq_close(mq_server);
-    return res->result;
-}
-
-// Implementación de las funciones de `claves.h`
-int destroy() {
-    RequestMessage req = {0};
-    ResponseMessage res;
-    req.operation = 0;
-    return send_request_to_server(&req, &res);
+    return sock;
 }
 
 int set_value(int key, char *value1, int N_value2, double *V_value2, struct Coord value3) {
-    // verificar que los punteros no son nulos
-    if (value1 == NULL || V_value2 == NULL) return -1;
+    int sock = conectar_servidor();
+    if (sock < 0) return -1;
 
-    RequestMessage req = {0};
-    ResponseMessage res;
-    req.operation = 1;
-    req.key = key;
-    strncpy(req.value1, value1, 255);
-    req.N_value2 = N_value2;
-    memcpy(req.V_value2, V_value2, N_value2 * sizeof(double));
-    req.value3 = value3;
-    return send_request_to_server(&req, &res);
+    char buffer[MAX_BUFFER];
+    char valores[512] = "";
+    for (int i = 0; i < N_value2; i++) {
+        char temp[32];
+        snprintf(temp, sizeof(temp), "%.2f", V_value2[i]);
+        strcat(valores, temp);
+        if (i < N_value2 - 1) strcat(valores, ",");
+    }
+
+    snprintf(buffer, sizeof(buffer), "SET|%d|%s|%d|%s|%d|%d", key, value1, N_value2, valores, value3.x, value3.y);
+    send(sock, buffer, strlen(buffer), 0);
+    recv(sock, buffer, MAX_BUFFER, 0);
+    close(sock);
+
+    return (strcmp(buffer, "OK") == 0) ? 0 : -1;
 }
 
 int get_value(int key, char *value1, int *N_value2, double *V_value2, struct Coord *value3) {
-    // verificar que los punteros no son nulos
-    if (N_value2 == NULL || V_value2 == NULL || value3 == NULL || value1 == NULL) return -1;
+    int sock = conectar_servidor();
+    if (sock < 0) return -1;
 
-    RequestMessage req = {0};
-    ResponseMessage res;
-    req.operation = 2;
-    req.key = key;
+    char buffer[MAX_BUFFER];
+    snprintf(buffer, sizeof(buffer), "GET|%d", key);
+    send(sock, buffer, strlen(buffer), 0);
 
-    int result = send_request_to_server(&req, &res);
-    // verificar que la respuesta es correcta
-    if (result == 0) {
-        strncpy(value1, res.value1, 255);
-        *N_value2 = res.N_value2;
-        memcpy(V_value2, res.V_value2, res.N_value2 * sizeof(double));
-        *value3 = res.value3;
+    int len = recv(sock, buffer, MAX_BUFFER, 0);
+    buffer[len] = '\0';
+    close(sock);
+
+    if (strncmp(buffer, "ERROR", 5) == 0) return -1;
+
+    // Formato esperado: OK|value1|N|v2,v2,v2|x|y
+    char *token = strtok(buffer, "|"); // OK
+    token = strtok(NULL, "|"); // value1
+    strncpy(value1, token, 255);
+    value1[255] = '\0';
+
+    token = strtok(NULL, "|"); // N_value2
+    *N_value2 = atoi(token);
+
+    token = strtok(NULL, "|"); // valores V_value2
+    char *val = strtok(token, ",");
+    int i = 0;
+    while (val && i < 32) {
+        V_value2[i++] = atof(val);
+        val = strtok(NULL, ",");
     }
-    return result;
+
+    token = strtok(NULL, "|"); // x
+    value3->x = atoi(token);
+
+    token = strtok(NULL, "|"); // y
+    value3->y = atoi(token);
+
+    return 0;
 }
 
 int modify_value(int key, char *value1, int N_value2, double *V_value2, struct Coord value3) {
-    // verificar que los punteros no son nulos
-    if (value1 == NULL || V_value2 == NULL) return -1;
-    RequestMessage req = {0};
-    ResponseMessage res;
-    req.operation = 3;
-    req.key = key;
-    strncpy(req.value1, value1, 255);
-    req.N_value2 = N_value2;
-    memcpy(req.V_value2, V_value2, N_value2 * sizeof(double));
-    req.value3 = value3;
-    return send_request_to_server(&req, &res);
+    int sock = conectar_servidor();
+    if (sock < 0) return -1;
+
+    char buffer[MAX_BUFFER];
+    char valores[512] = "";
+    for (int i = 0; i < N_value2; i++) {
+        char temp[32];
+        snprintf(temp, sizeof(temp), "%.2f", V_value2[i]);
+        strcat(valores, temp);
+        if (i < N_value2 - 1) strcat(valores, ",");
+    }
+
+    snprintf(buffer, sizeof(buffer), "MODIFY|%d|%s|%d|%s|%d|%d", key, value1, N_value2, valores, value3.x, value3.y);
+    send(sock, buffer, strlen(buffer), 0);
+    recv(sock, buffer, MAX_BUFFER, 0);
+    close(sock);
+
+    return (strcmp(buffer, "OK") == 0) ? 0 : -1;
 }
 
 int delete_key(int key) {
-    // verificar que la clave es valida
-    if (key < 0) return -1;
+    int sock = conectar_servidor();
+    if (sock < 0) return -1;
 
-    RequestMessage req = {0};
-    ResponseMessage res;
-    req.operation = 4;
-    req.key = key;
-    return send_request_to_server(&req, &res);
+    char buffer[MAX_BUFFER];
+    snprintf(buffer, sizeof(buffer), "DELETE|%d", key);
+    send(sock, buffer, strlen(buffer), 0);
+    recv(sock, buffer, MAX_BUFFER, 0);
+    close(sock);
+
+    return (strcmp(buffer, "OK") == 0) ? 0 : -1;
 }
 
 int exist(int key) {
-    // verificar que la clave es valida
-    if (key < 0) return -1;
-    RequestMessage req = {0};
-    ResponseMessage res;
-    req.operation = 5;
-    req.key = key;
-    return send_request_to_server(&req, &res);
+    int sock = conectar_servidor();
+    if (sock < 0) return -1;
+
+    char buffer[MAX_BUFFER];
+    snprintf(buffer, sizeof(buffer), "EXIST|%d", key);
+    send(sock, buffer, strlen(buffer), 0);
+    recv(sock, buffer, MAX_BUFFER, 0);
+    close(sock);
+
+    if (strncmp(buffer, "1", 1) == 0) return 1;
+    else if (strncmp(buffer, "0", 1) == 0) return 0;
+    else return -1;
 }
