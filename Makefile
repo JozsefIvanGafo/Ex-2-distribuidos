@@ -27,8 +27,8 @@ $(LIBRARY): proxy-sock.c
 	$(CC) $(CFLAGS) -fPIC -shared -o $(LIBRARY) proxy-sock.c -Wl,--export-dynamic $(LDFLAGS)
 
 # Compilar el servidor con claves.c
-$(SERVER): servidor-sock.c claves.c
-	$(CC) $(CFLAGS) -o $(SERVER) servidor-sock.c claves.c -pthread
+$(SERVER): servidor-sock.c claves.c lines.c
+	$(CC) $(CFLAGS) -o $(SERVER) servidor-sock.c claves.c lines.c -pthread
 
 # Regla de patrón para compilar cada cliente individualmente
 app-cliente-%: app-cliente-%.c $(LIBRARY)
