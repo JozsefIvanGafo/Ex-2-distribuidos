@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include "claves.h"
+#include "lines.h"
 
 #define MAX_CLIENTES 10
 #define MAX_BUFFER 1024
@@ -17,7 +18,7 @@ void *manejar_cliente(void *socket_desc) {
 
     while (1) {
         memset(buffer, 0, MAX_BUFFER);
-        ssize_t len = recv(sock, buffer, MAX_BUFFER, 0);
+        ssize_t len = recvMessage(sock, buffer, MAX_BUFFER);
         if (len <= 0) break;
 
         // Parsear operación
@@ -110,7 +111,7 @@ void *manejar_cliente(void *socket_desc) {
             }
         }
 
-        send(sock, respuesta, strlen(respuesta), 0);
+        sendMessage(sock, respuesta, strlen(respuesta));
     }
 
     close(sock);

@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "claves.h"
+#include "lines.h"
 
 #define MAX_BUFFER 1024
 
@@ -19,6 +20,7 @@ int conectar_servidor() {
 
     int port = atoi(port_str);
     int sock = socket(AF_INET, SOCK_STREAM, 0);
+
     if (sock < 0) {
         perror("Error al crear socket");
         return -1;
@@ -52,8 +54,8 @@ int set_value(int key, char *value1, int N_value2, double *V_value2, struct Coor
     }
 
     snprintf(buffer, sizeof(buffer), "SET|%d|%s|%d|%s|%d|%d", key, value1, N_value2, valores, value3.x, value3.y);
-    send(sock, buffer, strlen(buffer), 0);
-    recv(sock, buffer, MAX_BUFFER, 0);
+    sendMessage(sock, buffer, strlen(buffer));
+    recvMessage(sock, buffer, MAX_BUFFER);
     close(sock);
 
     return (strcmp(buffer, "OK") == 0) ? 0 : -1;
@@ -65,9 +67,9 @@ int get_value(int key, char *value1, int *N_value2, double *V_value2, struct Coo
 
     char buffer[MAX_BUFFER];
     snprintf(buffer, sizeof(buffer), "GET|%d", key);
-    send(sock, buffer, strlen(buffer), 0);
+    sendMessage(sock, buffer, strlen(buffer));
 
-    int len = recv(sock, buffer, MAX_BUFFER, 0);
+    int len = recvMessage(sock, buffer, MAX_BUFFER);
     buffer[len] = '\0';
     close(sock);
 
@@ -113,8 +115,8 @@ int modify_value(int key, char *value1, int N_value2, double *V_value2, struct C
     }
 
     snprintf(buffer, sizeof(buffer), "MODIFY|%d|%s|%d|%s|%d|%d", key, value1, N_value2, valores, value3.x, value3.y);
-    send(sock, buffer, strlen(buffer), 0);
-    recv(sock, buffer, MAX_BUFFER, 0);
+    sendMessage(sock, buffer, strlen(buffer));
+    recvMessage(sock, buffer, MAX_BUFFER);
     close(sock);
 
     return (strcmp(buffer, "OK") == 0) ? 0 : -1;
@@ -126,8 +128,8 @@ int delete_key(int key) {
 
     char buffer[MAX_BUFFER];
     snprintf(buffer, sizeof(buffer), "DELETE|%d", key);
-    send(sock, buffer, strlen(buffer), 0);
-    recv(sock, buffer, MAX_BUFFER, 0);
+    sendMessage(sock, buffer, strlen(buffer));
+    recvMessage(sock, buffer, MAX_BUFFER);
     close(sock);
 
     return (strcmp(buffer, "OK") == 0) ? 0 : -1;
@@ -139,11 +141,25 @@ int exist(int key) {
 
     char buffer[MAX_BUFFER];
     snprintf(buffer, sizeof(buffer), "EXIST|%d", key);
-    send(sock, buffer, strlen(buffer), 0);
-    recv(sock, buffer, MAX_BUFFER, 0);
+    sendMessage(sock, buffer, strlen(buffer));
+    recvMessage(sock, buffer, MAX_BUFFER);
     close(sock);
 
     if (strncmp(buffer, "1", 1) == 0) return 1;
     else if (strncmp(buffer, "0", 1) == 0) return 0;
     else return -1;
 }
+
+int destroy() {
+    int sock = conectar_servidor();
+    if (sock < 0) return -1;
+
+    char buffer[MAX_BUFFER];
+    snprintf(buffer, sizeof(buffer), "DESTROY");
+    sendMessage(sock, buffer, strlen(buffer));
+    recvMessage(sock, buffer, MAX_BUFFER);
+    close(sock);
+
+    return (strcmp(buffer, "OK") == 0) ? 0 : -1;
+}
+
