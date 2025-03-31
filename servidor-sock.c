@@ -7,13 +7,19 @@
 #include <netinet/in.h>
 #include "claves.h"
 #include "lines.h"
+#include "threadpool.h"
 
 #define MAX_CLIENTES 10
 #define MAX_BUFFER 1024
 
-void *manejar_cliente(void *socket_desc) {
-    int sock = *(int *) socket_desc;
-    free(socket_desc);
+typedef struct {
+    int sock;
+} client_data_t;
+
+void handle_client(void *arg) {
+    client_data_t *client_data = (client_data_t *)arg;
+    int sock = client_data->sock;
+    free(client_data);
     char buffer[MAX_BUFFER];
 
     while (1) {
@@ -115,12 +121,18 @@ void *manejar_cliente(void *socket_desc) {
     }
 
     close(sock);
-    return NULL;
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Uso: %s <PUERTO>\n", argv[0]);
+        return 1;
+    }
+
+    // Create thread pool
+    threadpool_t *pool = threadpool_create(MAX_CLIENTES);
+    if (pool == NULL) {
+        fprintf(stderr, "Error al crear el pool de hilos\n");
         return 1;
     }
 
@@ -142,12 +154,13 @@ int main(int argc, char *argv[]) {
 
     if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
         perror("bind");
+        threadpool_destroy(pool);
         return 1;
     }
 
     listen(server_fd, MAX_CLIENTES);
 
-    printf("Servidor escuchando en puerto %d...\n", port);
+    printf("Servidor escuchando en puerto %d (usando threadpool)...\n", port);
 
     while (1) {
         struct sockaddr_in client_addr;
@@ -155,14 +168,25 @@ int main(int argc, char *argv[]) {
         int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &addr_size);
 
         if (client_fd >= 0) {
-            pthread_t thread;
-            int *new_sock = malloc(sizeof(int));
-            *new_sock = client_fd;
-            pthread_create(&thread, NULL, manejar_cliente, new_sock);
-            pthread_detach(thread);
+            client_data_t *client_data = malloc(sizeof(client_data_t));
+            if (client_data == NULL) {
+                close(client_fd);
+                continue;
+            }
+            
+            client_data->sock = client_fd;
+            
+            if (threadpool_add(pool, handle_client, client_data) != 0) {
+                fprintf(stderr, "Error al añadir tarea al pool de hilos\n");
+                free(client_data);
+                close(client_fd);
+            }
         }
     }
 
+    // This code is never reached in the current implementation
+    // but it's good practice to include cleanup
+    threadpool_destroy(pool);
     close(server_fd);
     return 0;
 }

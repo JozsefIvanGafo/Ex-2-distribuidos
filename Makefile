@@ -11,7 +11,7 @@ LDFLAGS = -pthread -lrt
 
 # Archivos fuente
 SRCS_PROXY = proxy-sock.c
-SRCS_SERVER = servidor-sock.c claves.c lines.c
+SRCS_SERVER = servidor-sock.c claves.c lines.c threadpool.c
 CLIENT_SRCS = $(wildcard app-cliente-*.c)
 
 # Objetos a generar

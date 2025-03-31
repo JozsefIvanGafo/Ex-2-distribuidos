@@ -273,3 +273,5 @@ bin/
 
 # Ignore all `library.jar` in `bin` dir
 */bin/library.jar
+*.so
+*.json
