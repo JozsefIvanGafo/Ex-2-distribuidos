@@ -6,7 +6,7 @@
 #include "claves.h"
 
 #define NUM_HIJOS 20
-#define OPERACIONES_POR_HIJO 1000
+#define OPERACIONES_POR_HIJO 100
 
 
 // Función que ejecutará cada proceso hijo

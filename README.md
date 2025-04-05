@@ -13,8 +13,8 @@
 ## 2. Estructura del Proyecto
 - **`claves.h`**: API del sistema de almacenamiento
 - **`claves.c`**: Implementación del almacenamiento usando listas enlazadas
-- **`proxy-sock.c`**: Proxy cliente que implementa la API mediante colas de mensajes
-- **`servidor-sock.c`**: Servidor multihilo que gestiona las peticiones
+- **`proxy-mq.c`**: Proxy cliente que implementa la API mediante colas de mensajes
+- **`servidor-mq.c`**: Servidor multihilo que gestiona las peticiones
 - **`app-cliente-1.c`**: Cliente para pruebas básicas de funcionalidad
 - **`app-cliente-2.c`**: Cliente para pruebas de límites y casos de error
 - **`app-cliente-3.c`**: Cliente para pruebas de concurrencia y carga
@@ -42,7 +42,7 @@ make clean
 ### Ejecución
 ```bash
 # Iniciar el servidor
-./servidor-sock
+./servidor-mq
 ```
 ```bash
 #Iniciar app-cliente-1
