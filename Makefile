@@ -7,13 +7,13 @@ LDFLAGS = -pthread
 
 # Archivos fuente
 SRCS_PROXY = proxy/proxy-sock.c
-SRCS_SERVER = servidor/servidor-sockt.c servidor/common/servicio.c servidor/common/pool_of_threads.c common/claves.c common/comm.c
+SRCS_SERVER = servidor/servidor-sock.c servidor/common/servicio.c servidor/common/pool_of_threads.c common/claves.c common/comm.c
 # Archivos fuente del cliente
 CLIENT_SRCS = $(wildcard apps/app-cliente-*.c)
 
 # Objetos generados
 LIBRARY = libclaves.so
-SERVER = servidor-sockt
+SERVER = servidor-sock
 # Quita la extension de .c
 CLIENT = $(notdir $(CLIENT_SRCS:.c=))
 
