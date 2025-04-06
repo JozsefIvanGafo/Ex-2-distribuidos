@@ -66,7 +66,7 @@ make clean
 #### Iniciar servidor
 ```bash
 # Iniciar el servidor (especificando el puerto)
-./servidor-sockt 4500
+./servidor-sock 4500
 ```
 #### Definir variables de entorno
 ```bash
