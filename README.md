@@ -71,20 +71,20 @@ make clean
 #### Definir variables de entorno
 ```bash
 # Definir variables de entorno para el cliente
-env IP_TUPLAS=localhost PORT_TUPLAS=4500
+export IP_TUPLAS=localhost PORT_TUPLAS=4500
 ```
 #### Ejecutar cliente
 ```bash
 # Iniciar app-cliente-1
-.\app-cliente-1
+./app-cliente-1
 ```
 ```bash
 # Iniciar app-cliente-2
-.\app-cliente-2
+./app-cliente-2
 ```
 ```bash
 # Iniciar app-cliente-3
-.\app-cliente-3
+./app-cliente-3
 ```
 #### Alternativa para ejecutar cliente
 ```bash
