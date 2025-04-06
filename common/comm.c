@@ -1,19 +1,29 @@
+/*
+ * Este código está basado en el código de ejemplo proporcionado por 
+ * el profesor de Sistemas Distribuidos en la UC3M
+ * https://github.com/acaldero/uc3m_sd/blob/main/transparencias/ejercicio_sockets_calculadora.md
+ */
 #include "comm.h"
 #include <stdlib.h>  
-#include <sys/ioctl.h>  // Add this for ioctl function
-#include <fcntl.h>  // Add this header for fcntl function and constants
+#include <sys/ioctl.h>  
+#include <fcntl.h>  
 
-// For the serverSocket function, mark the unused parameter with (void)
+/**
+ * Crea un socket para el servidor
+ * @param addr Dirección IP (no utilizada)
+ * @param port Puerto de escucha
+ * @param type Tipo de socket
+ * @return Descriptor del socket o -1 en caso de error
+ */
 int serverSocket(unsigned int addr, int port, int type) {
-    // Mark addr as used to avoid the warning
+    // Marcamos addr como usado para evitar warning
     (void)addr;
     
     struct sockaddr_in server_addr;
     int sd, ret;
     
-    // Rest of the function remains the same
     // Crear socket
-    sd = socket(AF_INET, type, 0) ;
+    sd = socket(AF_INET, type, 0);
     if (sd < 0) {
         perror("socket: ");
         return (0);
@@ -23,49 +33,56 @@ int serverSocket(unsigned int addr, int port, int type) {
     int val = 1;
     setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char *) &val, sizeof(int));
 
-    // Dirección
+    // Configurar dirección del servidor
     bzero((char *)&server_addr, sizeof(server_addr));
     server_addr.sin_family      = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port        = htons(port);
 
-    // Bind
+    // Asociar socket a la dirección
     ret = bind(sd, (const struct sockaddr *)&server_addr, sizeof(server_addr));
     if (ret == -1) {
         perror("bind: ");
         return -1;
     }
 
-    // Listen
+    // Poner socket en modo escucha
     ret = listen(sd, SOMAXCONN);
     if (ret == -1) {
         perror("listen: ");
         return -1;
     }
 
-    return sd ;
+    return sd;
 }
 
-int serverAccept ( int sd )
+/**
+ * Acepta una conexión entrante
+ * @param sd Descriptor del socket servidor
+ * @return Descriptor del socket cliente o -1 en caso de error
+ */
+int serverAccept(int sd)
 {
-    int sc ;
-    struct sockaddr_in client_addr ;
-    socklen_t size ;
+    int sc;
+    struct sockaddr_in client_addr;
+    socklen_t size;
 
-
-
-    size = sizeof(client_addr) ;
+    size = sizeof(client_addr);
     sc = accept(sd, (struct sockaddr *)&client_addr, (socklen_t *)&size);
     if (sc < 0) {
         perror("accept: ");
         return -1;
     }
 
-
-
-    return sc ;
+    return sc;
 }
 
+/**
+ * Crea un socket cliente y lo conecta al servidor
+ * @param remote Dirección IP o nombre del servidor
+ * @param port Puerto del servidor
+ * @return Descriptor del socket o -1 en caso de error
+ */
 int clientSocket(char *remote, int port)
 {
     struct sockaddr_in server_addr;
@@ -78,7 +95,7 @@ int clientSocket(char *remote, int port)
         return -1;
     }
 
-    // Add TCP keepalive option
+    // Añadir opción de keepalive TCP
     int optval = 1;
     if (setsockopt(sd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0) {
 #ifdef DEBUG
@@ -86,7 +103,6 @@ int clientSocket(char *remote, int port)
 #endif
     } 
 
-    // Socket is blocking by default, no need to set it explicitly
 #ifdef DEBUG
     printf("DEBUG: Using default blocking socket mode\n");
 #endif
@@ -104,20 +120,23 @@ int clientSocket(char *remote, int port)
     server_addr.sin_family  = AF_INET;
     server_addr.sin_port    = htons(port);
 
-    ret = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
+    ret = connect(sd, (struct sockaddr *) &server_addr, sizeof(server_addr));
     if (ret < 0) {
         perror("connect: ");
         return -1;
     }
 
-    return sd ;
+    return sd;
 }
 
+/**
+ * Cierra un socket
+ * @param sd Descriptor del socket a cerrar
+ * @return 0 en caso de éxito, -1 en caso de error
+ */
 int closeSocket(int sd)
 {
     int ret;
-    
-
     
     ret = close(sd);
     if (ret < 0) {
@@ -125,10 +144,16 @@ int closeSocket(int sd)
         return -1;
     }
     
-
     return ret;
 }
 
+/**
+ * Envía un mensaje a través del socket
+ * @param socket Descriptor del socket
+ * @param buffer Buffer con el mensaje a enviar
+ * @param len Longitud del mensaje
+ * @return 0 en caso de éxito, -1 en caso de error
+ */
 int sendMessage(int socket, char *buffer, int len)
 {
     int r;
@@ -147,18 +172,23 @@ int sendMessage(int socket, char *buffer, int len)
         buffer = buffer + r;
     } while ((l>0) && (r>=0));
 
-    // Add a small delay after sending to ensure data is transmitted
-    usleep(10000); // 10ms delay
     
     return 0;
 }
 
+/**
+ * Recibe un mensaje a través del socket
+ * @param socket Descriptor del socket
+ * @param buffer Buffer donde almacenar el mensaje recibido
+ * @param len Longitud máxima del mensaje
+ * @return 0 en caso de éxito, -1 en caso de error
+ */
 int recvMessage(int socket, char *buffer, int len)
 {
     int r;
     int l = len;
     
-    // Simple blocking implementation without retries
+    // Implementación bloqueante simple sin reintentos
     do {
         r = read(socket, buffer, l);
         if (r <= 0) {
@@ -181,12 +211,25 @@ int recvMessage(int socket, char *buffer, int len)
     return 0;
 }
 
-ssize_t writeLine ( int fd, char *buffer )
+/**
+ * Escribe una línea en el socket
+ * @param fd Descriptor del socket
+ * @param buffer Buffer con la línea a escribir
+ * @return Resultado de la operación
+ */
+ssize_t writeLine(int fd, char *buffer)
 {
-    return sendMessage(fd, buffer, strlen(buffer)+1) ;
+    return sendMessage(fd, buffer, strlen(buffer)+1);
 }
 
-ssize_t readLine ( int fd, char *buffer, size_t n )
+/**
+ * Lee una línea del socket
+ * @param fd Descriptor del socket
+ * @param buffer Buffer donde almacenar la línea leída
+ * @param n Tamaño máximo del buffer
+ * @return Número de bytes leídos o -1 en caso de error
+ */
+ssize_t readLine(int fd, char *buffer, size_t n)
 {
     ssize_t numRead;  /* bytes leídos en último read() */
     size_t totRead;   /* bytes leídos hasta ahora */
@@ -227,47 +270,45 @@ ssize_t readLine ( int fd, char *buffer, size_t n )
     return totRead;
 }
 
-// Global socket for server connection
+// Socket global para la conexión con el servidor
 static int server_socket = -1;
 
+/**
+ * Conecta con el servidor de tuplas
+ * @return Descriptor del socket o -1 en caso de error
+ */
 int connectServer() {
     char *server_ip;
     int server_port;
     
-    // Get server IP and port from environment variables
+    // Obtener IP y puerto del servidor desde variables de entorno
     server_ip = getenv("IP_TUPLAS");
     if (server_ip == NULL) {
-        server_ip = "127.0.0.1"; // Default to localhost if not set
+        server_ip = "127.0.0.1"; // Por defecto localhost
     } 
     
     char *port_str = getenv("PORT_TUPLAS");
     if (port_str == NULL) {
-        server_port = 8080; // Default port if not set
+        server_port = 8080; // Puerto por defecto
     } else {
         server_port = atoi(port_str);
     }
     
-    // Create a new connection each time
+    // Crear una nueva conexión
     int sd = clientSocket(server_ip, server_port);
     if (sd >= 0) {
 #ifdef DEBUG
         printf("DEBUG: Connected to server %s:%d\n", server_ip, server_port);
 #endif
-        
-        // Ensure socket is in blocking mode
-        int flags = fcntl(sd, F_GETFL, 0);
-        if (flags >= 0) {
-            flags &= ~O_NONBLOCK;  // Clear non-blocking flag
-            fcntl(sd, F_SETFL, flags);
-#ifdef DEBUG
-            printf("DEBUG: Socket set to blocking mode\n");
-#endif
-        }
+    
     }
 
     return sd;
 }
 
+/**
+ * Desconecta del servidor de tuplas
+ */
 void disconnectServer() {
     if (server_socket >= 0) {
         closeSocket(server_socket);

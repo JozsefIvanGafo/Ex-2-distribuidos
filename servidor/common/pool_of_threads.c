@@ -5,36 +5,56 @@
 #include <unistd.h>
 #include "servicio.h"
 
+/**
+ * @brief Implementación de un pool de hilos para procesar peticiones de clientes
+ * 
+ * Este archivo implementa un pool de hilos que permite procesar múltiples
+ * peticiones de clientes de forma concurrente. Utiliza un buffer circular
+ * para almacenar las conexiones pendientes y mecanismos de sincronización
+ * para coordinar el acceso al buffer entre los hilos.
+ */
+
+// Número máximo de hilos en el pool
 #define MAX_THREADS 10
+// Tamaño máximo del buffer de conexiones
 #define MAX_CONNECTIONS 256
 
-// Estructura para mantener la información de conexión del cliente
+/**
+ * @brief Estructura para almacenar información de conexión de un cliente
+ */
 typedef struct {
-    int sd;  // Descriptor de socket para el cliente
+    int sd;  // Descriptor de socket del cliente
 } ClientConnection;
 
-// Buffer para conexiones de clientes
+// Buffer circular para almacenar conexiones pendientes
 ClientConnection connection_buffer[MAX_CONNECTIONS];
-int num_connections = 0;
-int insert_pos = 0;
-int service_pos = 0;
+int num_connections = 0;  // Número actual de conexiones en el buffer
+int insert_pos = 0;       // Posición para insertar la próxima conexión
+int service_pos = 0;      // Posición para obtener la próxima conexión a procesar
 
-// Sincronización
+// Mecanismos de sincronización para el acceso al buffer
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t not_full = PTHREAD_COND_INITIALIZER;
-pthread_cond_t not_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t not_full = PTHREAD_COND_INITIALIZER;   // Señal: buffer no está lleno
+pthread_cond_t not_empty = PTHREAD_COND_INITIALIZER;  // Señal: buffer no está vacío
 
-// Control de terminación
+// Control de terminación de hilos
 pthread_mutex_t mutex_fin = PTHREAD_MUTEX_INITIALIZER;
-bool should_terminate = false;
+bool should_terminate = false;  // Bandera para indicar terminación
 
-// Función ejecutada por cada hilo en el pool
-// For the thread_function, mark the unused parameter with (void)
+/**
+ * @brief Función ejecutada por cada hilo del pool
+ * 
+ * Esta función implementa el bucle principal de cada hilo. El hilo espera
+ * hasta que haya una conexión disponible en el buffer, la procesa llamando
+ * a la función servicio(), y luego cierra el socket del cliente.
+ * 
+ * @param arg No utilizado
+ * @return NULL
+ */
 void* thread_function(void* arg) {
-    // Mark arg as used to avoid the warning
+    // Marcar arg como usado para evitar warning
     (void)arg;
     
-    // Rest of the function remains the same
     int client_sd;
     
 #ifdef DEBUG
@@ -73,17 +93,13 @@ void* thread_function(void* arg) {
         printf("[Server] Thread %ld processing client socket %d\n", pthread_self(), client_sd);
 #endif
         
-        // Process the client request
+        // Procesar la petición del cliente
         int result = servicio(client_sd);
         
-        // Check if service was successful
+        // Verificar si el servicio fue exitoso
         if (result < 0) {
 #ifdef DEBUG
             printf("[Server] Error processing client request on socket %d\n", client_sd);
-#endif
-        } else {
-#ifdef DEBUG
-            printf("[Server] Successfully processed client request on socket %d\n", client_sd);
 #endif
         }
         
@@ -97,7 +113,13 @@ void* thread_function(void* arg) {
     return NULL;
 }
 
-// Inicializar pool de hilos
+/**
+ * @brief Inicializa el pool de hilos
+ * 
+ * Crea MAX_THREADS hilos que ejecutarán la función thread_function.
+ * 
+ * @return 0 si la inicialización fue exitosa, -1 en caso de error
+ */
 int init_thread_pool() {
     pthread_t threads[MAX_THREADS];
     pthread_attr_t attr;
@@ -122,7 +144,16 @@ int init_thread_pool() {
     return 0;
 }
 
-// Añadir conexión de cliente al buffer
+/**
+ * @brief Añade una conexión de cliente al buffer para ser procesada
+ * 
+ * Esta función es llamada por el hilo principal cuando acepta una nueva
+ * conexión de cliente. Añade el descriptor de socket al buffer circular
+ * y señaliza a los hilos del pool que hay una nueva conexión disponible.
+ * 
+ * @param client_sd Descriptor de socket del cliente
+ * @return 0 si la conexión se añadió correctamente, -1 en caso de error
+ */
 int add_connection(int client_sd) {
     pthread_mutex_lock(&mutex);
     
@@ -149,7 +180,13 @@ int add_connection(int client_sd) {
     return 0;
 }
 
-// Señalizar a los hilos que terminen
+/**
+ * @brief Señaliza a todos los hilos que deben terminar
+ * 
+ * Esta función es llamada cuando el servidor está finalizando.
+ * Establece la bandera should_terminate y despierta a todos los hilos
+ * para que puedan comprobar la bandera y terminar.
+ */
 void terminate_thread_pool() {
     // Establecer bandera de terminación
     pthread_mutex_lock(&mutex_fin);
@@ -162,7 +199,12 @@ void terminate_thread_pool() {
     pthread_mutex_unlock(&mutex);
 }
 
-// Liberar recursos
+/**
+ * @brief Libera los recursos utilizados por el pool de hilos
+ * 
+ * Esta función destruye los mutex y variables de condición utilizados
+ * para la sincronización entre hilos.
+ */
 void cleanup_thread_pool() {
     pthread_mutex_destroy(&mutex);
     pthread_cond_destroy(&not_full);
